@@ -1,0 +1,18 @@
+{
+  "name": "virtual-museum",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "sanity start",
+    "build": "sanity build"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "styled-components": "^6.1.15"
+  },
+  "devDependencies": {
+    "@sanity/cli": "^3.0.0",
+    "sanity": "^3.0.0"
+  }
+}

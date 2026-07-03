@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Interactive Virtual Museum — Prototype</title>
+<style>
+  :root{
+    --bg:#0e0d0b; --panel:#17150f; --panel-2:#1f1c14; --line:#3a3527;
+    --ink:#f2ede1; --ink-dim:#b8b09a; --accent:#c98a3b; --accent-dim:#8a5f28;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;}
+  #app{position:relative;width:100vw;height:100vh;}
+  canvas{display:block;outline:none;}
+
+  /* top bar */
+  #topbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;
+    justify-content:space-between;padding:14px 18px;z-index:10;pointer-events:none;
+    background:linear-gradient(to bottom, rgba(0,0,0,.55), transparent);}
+  #title{font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);pointer-events:auto;}
+  #title b{color:var(--ink);font-weight:600;}
+
+  /* mode switcher */
+  #modes{position:absolute;top:14px;right:14px;display:flex;gap:6px;z-index:10;pointer-events:auto;
+    background:rgba(23,21,15,.85);border:1px solid var(--line);border-radius:10px;padding:5px;
+    backdrop-filter:blur(6px);}
+  .mode-btn{background:transparent;border:none;color:var(--ink-dim);font-size:12px;padding:8px 12px;
+    border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap;}
+  .mode-btn:hover{color:var(--ink);background:var(--panel-2);}
+  .mode-btn.active{background:var(--accent-dim);color:var(--ink);}
+
+  /* help / crosshair */
+  #crosshair{position:absolute;top:50%;left:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
+    border-radius:50%;background:rgba(242,237,225,.6);z-index:8;pointer-events:none;display:none;}
+  #hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:9;
+    background:rgba(23,21,15,.85);border:1px solid var(--line);border-radius:8px;
+    padding:8px 14px;font-size:12px;color:var(--ink-dim);pointer-events:none;text-align:center;
+    max-width:90vw;}
+
+  /* artwork info panel */
+  #infoPanel{position:absolute;right:0;top:0;bottom:0;width:340px;max-width:88vw;
+    background:rgba(15,14,10,.96);border-left:1px solid var(--line);z-index:40;
+    transform:translateX(100%);transition:transform .35s ease;padding:26px 22px;
+    overflow-y:auto;}
+  #infoPanel.open{transform:translateX(0);}
+  #infoPanel .medium{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;}
+  #infoPanel h2{margin:0 0 4px;font-size:20px;font-weight:600;}
+  #infoPanel .artist{font-size:13px;color:var(--ink-dim);margin-bottom:18px;}
+  #infoPanel p{font-size:14px;line-height:1.65;color:var(--ink-dim);margin:0 0 16px;}
+  #infoPanel .advocacy{border-left:2px solid var(--accent);padding-left:12px;font-size:13px;color:var(--ink);}
+  #closeInfo{background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);
+    padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;margin-top:8px;}
+  #closeInfo:hover{color:var(--ink);}
+
+  /* joystick (touch) */
+  #joystick{position:absolute;left:26px;bottom:26px;width:110px;height:110px;border-radius:50%;
+    background:rgba(23,21,15,.55);border:1px solid var(--line);z-index:12;display:none;touch-action:none;}
+  #joyStick{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;
+    background:rgba(201,138,59,.75);pointer-events:none;}
+  #lookPad{position:absolute;right:0;bottom:0;width:50vw;height:60vh;z-index:11;display:none;touch-action:none;}
+
+  /* 2D / list accessible mode */
+  #listView{position:absolute;inset:0;background:var(--bg);z-index:30;display:none;
+    overflow-y:auto;padding:70px 24px 40px;}
+  #listView.open{display:block;}
+  #listView .wrap{max-width:760px;margin:0 auto;}
+  #listView h1{font-size:22px;margin:0 0 6px;}
+  #listView .sub{font-size:13px;color:var(--ink-dim);margin-bottom:26px;}
+  .artCard{display:flex;gap:16px;padding:16px;border:1px solid var(--line);border-radius:10px;
+    margin-bottom:12px;background:var(--panel);cursor:pointer;text-align:left;width:100%;color:var(--ink);}
+  .artCard:hover,.artCard:focus-visible{border-color:var(--accent-dim);outline:none;}
+  .swatch{width:56px;height:56px;border-radius:8px;flex-shrink:0;}
+  .artCard .meta .medium{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);}
+  .artCard .meta h3{margin:2px 0 4px;font-size:15px;}
+  .artCard .meta p{margin:0;font-size:12px;color:var(--ink-dim);line-height:1.5;}
+
+  #enter3D{background:var(--accent-dim);border:none;color:var(--ink);padding:9px 16px;
+    border-radius:8px;cursor:pointer;font-size:12px;margin-bottom:20px;}
+
+  #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);z-index:50;font-size:13px;color:var(--ink-dim);letter-spacing:.05em;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="loading">Building the gallery…</div>
+
+  <div id="topbar">
+    <div id="title">Interactive Virtual Museum — <b>West Wing</b></div>
+  </div>
+
+  <div id="modes">
+    <button class="mode-btn" data-mode="walk">Walk</button>
+    <button class="mode-btn" data-mode="fly">Fly</button>
+    <button class="mode-btn" data-mode="orbit">Orbit</button>
+    <button class="mode-btn" data-mode="teleport">Teleport</button>
+    <button class="mode-btn" data-mode="list">List view</button>
+  </div>
+
+  <div id="crosshair"></div>
+  <div id="hint"></div>
+
+  <div id="joystick"><div id="joyStick"></div></div>
+  <div id="lookPad"></div>
+
+  <div id="infoPanel">
+    <div class="medium" id="infoMedium">Medium</div>
+    <h2 id="infoTitle">Title</h2>
+    <div class="artist" id="infoArtist">Artist</div>
+    <p id="infoDesc">Description</p>
+    <div class="advocacy" id="infoAdvocacy">Context</div>
+    <button id="closeInfo">Close</button>
+  </div>
+
+  <div id="listView">
+    <div class="wrap">
+      <button id="enter3D">← Back to 3D gallery</button>
+      <h1>West Wing — all works</h1>
+      <div class="sub">Accessible list mode. Every piece below is keyboard-navigable and carries full context.</div>
+      <div id="listItems"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const { PointerLockControls, OrbitControls } = THREE;
+
+/* ---------------------------------------------------------
+   CMS config — fill these in after `npx sanity@latest init`
+--------------------------------------------------------- */
+const SANITY = {
+  projectId: 'YOUR_PROJECT_ID',   // from manage.sanity.io
+  dataset: 'production',
+  apiVersion: '2024-01-01',
+  useCdn: true,                   // fast, cached reads — fine for public gallery content
+};
+
+const GROQ_QUERY = encodeURIComponent(`
+*[_type == "artwork"] | order(order asc) {
+  "id": _id,
+  medium,
+  title,
+  artist,
+  year,
+  description,
+  "advocacy": advocacyNote,
+  "wall": spatialPlacement.wall,
+  "x": spatialPlacement.x,
+  "imageUrl": mainImage.asset->url
+}
+`);
+
+function sanityConfigured(){
+  return SANITY.projectId && SANITY.projectId !== 'YOUR_PROJECT_ID';
+}
+
+/* placeholder colors cycled per medium when a piece has no image yet */
+const MEDIUM_COLOR = {
+  photography:'#3f6b7a', poetry:'#7a4f6b', writing:'#7a5a3a',
+  painting:'#8a6a3a', mural:'#3a7a52',
+};
+
+/* auto-arrange pieces evenly across the two long walls if no spatialPlacement was set in the CMS */
+function autoPlace(list){
+  const northCount = Math.ceil(list.length/2);
+  return list.map((a, i) => {
+    if (a.wall && typeof a.x === 'number') return a;
+    const onNorth = i < northCount;
+    const group = onNorth ? list.slice(0, northCount) : list.slice(northCount);
+    const idx = onNorth ? i : i - northCount;
+    const spread = (idx - (group.length-1)/2) * 3.4;
+    return { ...a, wall: onNorth ? 'north' : 'south', x: spread };
+  });
+}
+
+const FALLBACK_ARTWORKS = autoPlace([
+  { id:'a1', medium:'photography', title:'Low Tide, Lagos', artist:'A. Nwosu', year:'2024',
+    description:'A study of the harbor at dawn, shot on film to hold onto the grain of the light.',
+    advocacy:'Part of a coastal-erosion documentation series shown to local planning boards.' },
+  { id:'a2', medium:'poetry', title:'What the River Keeps', artist:'T. Adeyemi', year:'2023',
+    description:'A four-part poem written for the communities displaced by the Ogun river floods.',
+    advocacy:'Read at three community hearings; excerpted in regional flood-relief reporting.' },
+  { id:'a3', medium:'painting', title:'Interior, Afternoon', artist:'K. Balogun', year:'2022',
+    description:'Oil on canvas. A quiet domestic scene rendered in warm, deliberate brushwork.',
+    advocacy:'First solo-show piece; opened conversation on housing security in the artist\u2019s note.' },
+  { id:'a4', medium:'mural', title:'Voices of Makoko', artist:'Community collective', year:'2021',
+    description:'Documentation of a community mural spanning 40 meters along the waterfront.',
+    advocacy:'Commissioned as part of a youth arts and housing-rights initiative.' },
+  { id:'a5', medium:'writing', title:'Field Notes from Lekki', artist:'S. Okoro', year:'2024',
+    description:'A short essay on urban wetlands, written alongside a season of field research.',
+    advocacy:'Cited in a local environmental advocacy campaign\u2019s public materials.' },
+]);
+
+let ARTWORKS = FALLBACK_ARTWORKS;
+let usingLiveData = false;
+
+async function fetchArtworksFromSanity(){
+  if (!sanityConfigured()) return { ok:false, reason:'not-configured' };
+  const url = `https://${SANITY.projectId}.api${SANITY.useCdn ? 'cdn' : ''}.sanity.io/v${SANITY.apiVersion}/data/query/${SANITY.dataset}?query=${GROQ_QUERY}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return { ok:false, reason:`http-${res.status}` };
+    const json = await res.json();
+    const docs = (json.result || []).map(d => ({ ...d, medium: (d.medium || 'writing').toLowerCase() }));
+    if (!docs.length) return { ok:false, reason:'empty-dataset' };
+    return { ok:true, data: autoPlace(docs) };
+  } catch (err){
+    return { ok:false, reason: err.message };
+  }
+}
+
+/* ---------------------------------------------------------
+   Scene setup
+--------------------------------------------------------- */
+const app = document.getElementById('app');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x171512);
+scene.fog = new THREE.Fog(0x171512, 12, 26);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 1.7, 8);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true;
+app.prepend(renderer.domElement);
+
+// lighting
+scene.add(new THREE.AmbientLight(0xfff2df, 0.45));
+const key = new THREE.DirectionalLight(0xfff2df, 0.8);
+key.position.set(4, 8, 4);
+key.castShadow = true;
+scene.add(key);
+
+/* room geometry */
+const ROOM = { w: 14, d: 12, h: 4 };
+const floorMat = new THREE.MeshStandardMaterial({ color:0x2a2620, roughness:0.9 });
+const wallMat  = new THREE.MeshStandardMaterial({ color:0x1c1a15, roughness:0.95 });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w, ROOM.d), floorMat);
+floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
+const ceil = floor.clone(); ceil.position.y = ROOM.h; ceil.rotation.x = Math.PI/2; scene.add(ceil);
+
+function wall(w,h,x,y,z,ry){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w,h), wallMat);
+  m.position.set(x,y,z); m.rotation.y = ry; m.receiveShadow = true; scene.add(m); return m;
+}
+wall(ROOM.w, ROOM.h, 0, ROOM.h/2, -ROOM.d/2, 0);
+wall(ROOM.w, ROOM.h, 0, ROOM.h/2,  ROOM.d/2, Math.PI);
+wall(ROOM.d, ROOM.h, -ROOM.w/2, ROOM.h/2, 0, Math.PI/2);
+wall(ROOM.d, ROOM.h,  ROOM.w/2, ROOM.h/2, 0, -Math.PI/2);
+
+/* artworks as framed planes + canvas texture (real CMS image if present, else a flat placeholder) */
+const artMeshes = [];
+const artLights = [];
+
+function loadImage(url){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function makeArtworkTexture(a){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 320;
+  const ctx = c.getContext('2d');
+  if (a.imageUrl){
+    try {
+      const img = await loadImage(a.imageUrl);
+      // cover-fit the image into the canvas
+      const s = Math.max(512/img.width, 320/img.height);
+      const w = img.width*s, h = img.height*s;
+      ctx.drawImage(img, (512-w)/2, (320-h)/2, w, h);
+    } catch {
+      ctx.fillStyle = MEDIUM_COLOR[a.medium] || '#4a4436'; ctx.fillRect(0,0,512,320);
+    }
+  } else {
+    ctx.fillStyle = MEDIUM_COLOR[a.medium] || '#4a4436'; ctx.fillRect(0,0,512,320);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,.32)'; ctx.fillRect(0,250,512,70);
+  ctx.fillStyle = '#f2ede1'; ctx.font = '600 22px sans-serif';
+  ctx.fillText(a.title, 18, 282);
+  ctx.fillStyle = '#c9c2ae'; ctx.font = '14px sans-serif';
+  ctx.fillText(a.medium + ' · ' + a.artist, 18, 304);
+  return new THREE.CanvasTexture(c);
+}
+
+function clearArtworks(){
+  artMeshes.forEach(m => scene.remove(m));
+  artLights.forEach(({spot,target}) => scene.remove(spot, target));
+  artMeshes.length = 0; artLights.length = 0;
+}
+
+async function buildArtworks(list){
+  clearArtworks();
+  await Promise.all(list.map(async (a) => {
+    const spot = new THREE.SpotLight(0xffedd0, 0.9, 8, Math.PI/6, 0.5);
+    spot.position.set(a.x, 3.2, a.wall === 'north' ? -5.3 : 5.3);
+    spot.target.position.set(a.x, 1.6, a.wall === 'north' ? -6 : 6);
+    scene.add(spot, spot.target);
+    artLights.push({ spot, target: spot.target });
+
+    const z = a.wall === 'north' ? -ROOM.d/2 + 0.06 : ROOM.d/2 - 0.06;
+    const ry = a.wall === 'north' ? 0 : Math.PI;
+    const texture = await makeArtworkTexture(a);
+    const frame = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.6, 1.7),
+      new THREE.MeshStandardMaterial({ map: texture, roughness:0.6 })
+    );
+    frame.position.set(a.x, 1.9, z);
+    frame.rotation.y = ry;
+    frame.userData.artwork = a;
+    frame.castShadow = true;
+    scene.add(frame);
+    artMeshes.push(frame);
+  }));
+}
+
+/* floor teleport markers */
+const teleportGroup = new THREE.Group(); scene.add(teleportGroup);
+const spots = [[0,3.5],[-4,0],[4,0],[0,-2],[0,-4.5]];
+const markerMat = new THREE.MeshBasicMaterial({ color:0xc98a3b, transparent:true, opacity:0.55 });
+spots.forEach(([x,z]) => {
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.28,0.4,32), markerMat);
+  m.rotation.x = -Math.PI/2; m.position.set(x,0.02,z);
+  m.userData.teleport = true;
+  teleportGroup.add(m);
+});
+
+/* room bounds for collision */
+const BOUND = { minX:-ROOM.w/2+0.6, maxX:ROOM.w/2-0.6, minZ:-ROOM.d/2+0.6, maxZ:ROOM.d/2-0.6 };
+function clampToRoom(v){
+  v.x = Math.max(BOUND.minX, Math.min(BOUND.maxX, v.x));
+  v.z = Math.max(BOUND.minZ, Math.min(BOUND.maxZ, v.z));
+  return v;
+}
+
+/* ---------------------------------------------------------
+   Movement modes
+--------------------------------------------------------- */
+let mode = 'walk';
+const clock = new THREE.Clock();
+const keys = {};
+addEventListener('keydown', e => keys[e.code] = true);
+addEventListener('keyup',   e => keys[e.code] = false);
+
+// Walk mode: pointer lock
+const walkControls = new PointerLockControls(camera, renderer.domElement);
+const WALK_SPEED = 3.4;
+
+// Fly mode: free-look, no gravity, no pointer lock requirement beyond drag
+let flyYaw = 0, flyPitch = 0;
+const FLY_SPEED = 5;
+let flyDragging = false, flyLastX=0, flyLastY=0;
+
+// Orbit mode
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+orbitControls.target.set(0, 1.6, 0);
+orbitControls.enableDamping = true;
+orbitControls.minDistance = 2; orbitControls.maxDistance = 9;
+orbitControls.maxPolarAngle = Math.PI * 0.6;
+orbitControls.enabled = false;
+
+// Teleport: click a marker to glide there
+let teleportAnim = null;
+function startTeleport(target){
+  const from = camera.position.clone();
+  const to = new THREE.Vector3(target.x, from.y, target.z);
+  teleportAnim = { from, to, t:0 };
+}
+
+/* raycaster shared by inspect + teleport */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function castFromCenterOrEvent(clientX, clientY){
+  ndc.x = (clientX/innerWidth)*2-1;
+  ndc.y = -(clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(ndc, camera);
+  return raycaster;
+}
+
+/* click-to-inspect */
+let inspecting = null;
+const infoPanel = document.getElementById('infoPanel');
+function mediumLabel(m){
+  return (m || '').replace(/^\w/, c => c.toUpperCase());
+}
+function openInfo(a){
+  document.getElementById('infoMedium').textContent = mediumLabel(a.medium);
+  document.getElementById('infoTitle').textContent = a.title;
+  document.getElementById('infoArtist').textContent = a.artist + ' · ' + (a.year || '');
+  document.getElementById('infoDesc').textContent = a.description || '';
+  document.getElementById('infoAdvocacy').textContent = a.advocacy || '';
+  infoPanel.classList.add('open');
+}
+document.getElementById('closeInfo').onclick = () => { infoPanel.classList.remove('open'); inspecting = null; };
+
+function handlePick(clientX, clientY){
+  const locked = document.pointerLockElement === renderer.domElement;
+  const rc = locked
+    ? castFromCenterOrEvent(innerWidth/2, innerHeight/2)
+    : castFromCenterOrEvent(clientX, clientY);
+  const hitsArt = rc.intersectObjects(artMeshes);
+  if (hitsArt.length){
+    const mesh = hitsArt[0].object;
+    const a = mesh.userData.artwork;
+    const dir = mesh.position.clone().sub(camera.position).normalize();
+    const targetPos = mesh.position.clone().sub(dir.multiplyScalar(2.4));
+    targetPos.y = 1.7;
+    inspecting = { targetPos, lookAt: mesh.position.clone() };
+    openInfo(a);
+    return true;
+  }
+  if (mode === 'teleport'){
+    const hitsFloor = rc.intersectObject(floor);
+    if (hitsFloor.length){ startTeleport(clampToRoom(hitsFloor[0].point.clone())); return true; }
+  }
+  return false;
+}
+
+renderer.domElement.addEventListener('click', (e) => {
+  if (mode === 'walk' && !walkControls.isLocked){ walkControls.lock(); return; }
+  handlePick(e.clientX, e.clientY);
+});
+
+/* ---------------------------------------------------------
+   Touch controls (joystick + look pad)
+--------------------------------------------------------- */
+const isTouch = matchMedia('(pointer: coarse)').matches;
+const joystick = document.getElementById('joystick');
+const joyStick = document.getElementById('joyStick');
+const lookPad = document.getElementById('lookPad');
+let joyVec = {x:0,y:0}, joyActive=false, joyId=null;
+let lookId=null, lookLastX=0, lookLastY=0;
+
+function setupTouch(){
+  joystick.style.display = 'block';
+  lookPad.style.display = 'block';
+
+  joystick.addEventListener('touchstart', e => {
+    joyActive = true; joyId = e.changedTouches[0].identifier;
+  });
+  joystick.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches){
+      if (t.identifier !== joyId) continue;
+      const r = joystick.getBoundingClientRect();
+      let dx = t.clientX - (r.left+r.width/2), dy = t.clientY - (r.top+r.height/2);
+      const max = 38; const len = Math.hypot(dx,dy);
+      if (len > max){ dx = dx/len*max; dy = dy/len*max; }
+      joyStick.style.transform = `translate(${dx}px,${dy}px)`;
+      joyVec = { x: dx/max, y: dy/max };
+    }
+    e.preventDefault();
+  }, {passive:false});
+  joystick.addEventListener('touchend', () => {
+    joyActive = false; joyVec = {x:0,y:0}; joyStick.style.transform = 'translate(0,0)';
+  });
+
+  lookPad.addEventListener('touchstart', e => {
+    lookId = e.changedTouches[0].identifier;
+    lookLastX = e.changedTouches[0].clientX; lookLastY = e.changedTouches[0].clientY;
+  });
+  lookPad.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches){
+      if (t.identifier !== lookId) continue;
+      const dx = t.clientX - lookLastX, dy = t.clientY - lookLastY;
+      lookLastX = t.clientX; lookLastY = t.clientY;
+      flyYaw -= dx * 0.004; flyPitch -= dy * 0.004;
+      flyPitch = Math.max(-1.3, Math.min(1.3, flyPitch));
+    }
+    e.preventDefault();
+  }, {passive:false});
+}
+if (isTouch) setupTouch();
+
+/* mouse-drag look for fly mode (desktop) */
+renderer.domElement.addEventListener('mousedown', e => {
+  if (mode !== 'fly') return;
+  flyDragging = true; flyLastX = e.clientX; flyLastY = e.clientY;
+});
+addEventListener('mouseup', () => flyDragging = false);
+addEventListener('mousemove', e => {
+  if (mode !== 'fly' || !flyDragging) return;
+  flyYaw -= (e.clientX - flyLastX) * 0.003;
+  flyPitch -= (e.clientY - flyLastY) * 0.003;
+  flyPitch = Math.max(-1.3, Math.min(1.3, flyPitch));
+  flyLastX = e.clientX; flyLastY = e.clientY;
+});
+
+/* ---------------------------------------------------------
+   Mode switching
+--------------------------------------------------------- */
+const hint = document.getElementById('hint');
+const crosshair = document.getElementById('crosshair');
+const HINTS = {
+  walk: 'Click to look around · WASD to walk · click an artwork to inspect',
+  fly: 'Drag to look · WASD + Q/E to fly freely',
+  orbit: 'Drag to orbit · scroll to zoom · click an artwork to inspect',
+  teleport: 'Click a glowing marker on the floor to move there',
+  list: ''
+};
+function setMode(next){
+  mode = next;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === next));
+  orbitControls.enabled = (next === 'orbit');
+  if (walkControls.isLocked && next !== 'walk') walkControls.unlock();
+  crosshair.style.display = (next === 'walk' || next === 'fly') ? 'block' : 'none';
+  hint.textContent = HINTS[next];
+  hint.style.display = next === 'list' ? 'none' : 'block';
+  document.getElementById('listView').classList.toggle('open', next === 'list');
+  if (next === 'list') buildListView();
+}
+document.querySelectorAll('.mode-btn').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+document.getElementById('enter3D').onclick = () => setMode(isTouch ? 'teleport' : 'walk');
+setMode(isTouch ? 'teleport' : 'walk');
+
+/* accessible list view */
+function buildListView(){
+  const wrap = document.getElementById('listItems');
+  wrap.innerHTML = '';
+  ARTWORKS.forEach(a => {
+    const card = document.createElement('button');
+    card.className = 'artCard';
+    const swatchStyle = a.imageUrl
+      ? `background:center/cover url('${a.imageUrl}')`
+      : `background:${MEDIUM_COLOR[a.medium] || '#4a4436'}`;
+    card.innerHTML = `
+      <div class="swatch" style="${swatchStyle}"></div>
+      <div class="meta">
+        <div class="medium">${mediumLabel(a.medium)}</div>
+        <h3>${a.title}</h3>
+        <p><strong>${a.artist}</strong>, ${a.year || ''} — ${a.description || ''} ${a.advocacy || ''}</p>
+      </div>`;
+    card.onclick = () => { openInfo(a); };
+    wrap.appendChild(card);
+  });
+}
+
+/* ---------------------------------------------------------
+   Animate
+--------------------------------------------------------- */
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // spin teleport markers gently
+  teleportGroup.children.forEach(m => m.rotation.z += dt * 0.6);
+
+  if (inspecting){
+    camera.position.lerp(inspecting.targetPos, 0.08);
+    const look = new THREE.Vector3().lerpVectors(
+      camera.position.clone().add(new THREE.Vector3(0,0,-1)), inspecting.lookAt, 0.08
+    );
+    camera.lookAt(inspecting.lookAt);
+  } else if (teleportAnim){
+    teleportAnim.t += dt * 1.6;
+    const t = Math.min(1, teleportAnim.t);
+    const eased = 1 - Math.pow(1-t, 3);
+    camera.position.x = THREE.MathUtils.lerp(teleportAnim.from.x, teleportAnim.to.x, eased);
+    camera.position.z = THREE.MathUtils.lerp(teleportAnim.from.z, teleportAnim.to.z, eased);
+    if (t >= 1) teleportAnim = null;
+  } else if (mode === 'walk' && walkControls.isLocked){
+    const speed = WALK_SPEED * dt;
+    if (keys['KeyW']) walkControls.moveForward(speed);
+    if (keys['KeyS']) walkControls.moveForward(-speed);
+    if (keys['KeyA']) walkControls.moveRight(-speed);
+    if (keys['KeyD']) walkControls.moveRight(speed);
+    clampToRoom(camera.position);
+    camera.position.y = 1.7;
+  } else if (mode === 'fly'){
+    if (isTouch){
+      const fwd = new THREE.Vector3(Math.sin(flyYaw), 0, Math.cos(flyYaw)).multiplyScalar(-joyVec.y);
+      const strafe = new THREE.Vector3(Math.cos(flyYaw), 0, -Math.sin(flyYaw)).multiplyScalar(joyVec.x);
+      camera.position.addScaledVector(fwd.add(strafe), FLY_SPEED*dt);
+    } else {
+      const dir = new THREE.Vector3();
+      if (keys['KeyW']) dir.z -= 1; if (keys['KeyS']) dir.z += 1;
+      if (keys['KeyA']) dir.x -= 1; if (keys['KeyD']) dir.x += 1;
+      dir.applyEuler(new THREE.Euler(0, flyYaw, 0));
+      camera.position.addScaledVector(dir, FLY_SPEED*dt);
+      if (keys['KeyE']) camera.position.y += FLY_SPEED*dt;
+      if (keys['KeyQ']) camera.position.y -= FLY_SPEED*dt;
+    }
+    camera.position.y = Math.max(0.6, Math.min(ROOM.h-0.4, camera.position.y));
+    camera.quaternion.setFromEuler(new THREE.Euler(flyPitch, flyYaw, 0, 'YXZ'));
+  } else if (mode === 'orbit'){
+    orbitControls.update();
+  }
+
+  renderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ESC closes inspect panel too
+addEventListener('keydown', e => {
+  if (e.code === 'Escape' && inspecting){ inspecting = null; infoPanel.classList.remove('open'); }
+});
+
+async function init(){
+  const loadingEl = document.getElementById('loading');
+
+  const result = await fetchArtworksFromSanity();
+  if (result.ok){
+    ARTWORKS = result.data;
+    usingLiveData = true;
+  } else {
+    ARTWORKS = FALLBACK_ARTWORKS;
+    usingLiveData = false;
+    console.info(`Sanity not used (${result.reason}) — showing placeholder gallery data. ` +
+      `Set SANITY.projectId in the script to connect a real dataset.`);
+  }
+
+  await buildArtworks(ARTWORKS);
+
+  // small, unobtrusive data-source badge — helpful during development
+  const badge = document.createElement('div');
+  badge.textContent = usingLiveData ? 'Live data · Sanity' : 'Placeholder data · configure Sanity';
+  badge.style.cssText = `position:absolute;left:14px;bottom:14px;z-index:10;font-size:11px;
+    color:${usingLiveData ? '#8fbf8f' : '#c9a86a'};background:rgba(23,21,15,.85);
+    border:1px solid var(--line);border-radius:6px;padding:5px 9px;pointer-events:none;`;
+  app.appendChild(badge);
+
+  loadingEl.remove();
+  animate();
+}
+init();
+</script>
+</body>
+</html>
