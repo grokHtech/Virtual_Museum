@@ -1,5 +1,7 @@
 # Virtual Museum (Sanity Studio)
 
+[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+
 Minimal instructions to run the local Sanity studio included in this workspace.
 
 Prerequisites
@@ -26,6 +28,22 @@ http://localhost:3333/
 Notes
 - Set a valid `projectId` and `dataset` in `sanity.config.js` if you want to connect to a Sanity project (it currently contains `YOUR_PROJECT_ID`).
 - If you plan to publish a production build, run `npm run build` and use the `dist` output.
+
+Push to GitHub
+
+1. Create a repository on GitHub (or use the `gh` CLI):
+
+```bash
+# using GitHub CLI (recommended if installed)
+gh repo create OWNER/REPO --public --source=. --remote=origin --push
+
+# or manually add a remote and push:
+git remote add origin https://github.com/OWNER/REPO.git
+git branch -M main
+git push -u origin main
+```
+
+Replace `OWNER/REPO` with your GitHub username and repository name.
 
 Files changed
 - `package.json` — added scripts and dependencies
