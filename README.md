@@ -1,6 +1,6 @@
 # Virtual Museum (Sanity Studio)
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/grokHtech/Virtual_Museum/actions/workflows/ci.yml/badge.svg)](https://github.com/grokHtech/Virtual_Museum/actions/workflows/ci.yml)
 
 Minimal instructions to run the local Sanity studio included in this workspace.
 
@@ -35,10 +35,10 @@ Push to GitHub
 
 ```bash
 # using GitHub CLI (recommended if installed)
-gh repo create OWNER/REPO --public --source=. --remote=origin --push
+gh repo create grokHtech/Virtual_Museum --public --source=. --remote=origin --push
 
 # or manually add a remote and push:
-git remote add origin https://github.com/OWNER/REPO.git
+git remote add origin https://github.com/grokHtech/Virtual_Museum.git
 git branch -M main
 git push -u origin main
 ```
