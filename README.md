@@ -25,9 +25,10 @@ npm run dev
 
 http://localhost:3333/
 
-Notes
-- Set a valid `projectId` and `dataset` in `sanity.config.js` if you want to connect to a Sanity project (it currently contains `YOUR_PROJECT_ID`).
-- If you plan to publish a production build, run `npm run build` and use the `dist` output.
+**Notes**
+- **Local config:** `sanity.config.js` currently contains a placeholder project ID (`grokhtech-virtual-museum`). Replace it with your real Sanity `projectId` and `dataset` to connect to your project.
+- **Production build:** run `npm run build` and use the `dist` output.
+- **CORS:** If you deploy the Studio (example below), add the deployed domain to your Sanity project's CORS origins so the Studio can communicate with the API.
 
 Push to GitHub
 
@@ -48,3 +49,8 @@ Replace `OWNER/REPO` with your GitHub username and repository name.
 Files changed
 - `package.json` — added scripts and dependencies
 - `schemaTypes.js` — re-export for `sanity.config.js`
+
+Live demo
+
+- Production (Vercel): https://dist-d8acfbxov-hlabcrea-8-t.vercel.app
+- Aliased: https://dist-steel-eight-79.vercel.app
